@@ -1,0 +1,69 @@
+{
+  "name": "@meginhufr/brua-web",
+  "version": "0.1.0",
+  "description": "Brua for the web: AssetResponse types, the variant selection rule, <picture> rendering, and components for React, Vue and Svelte.",
+  "author": "Meginhufr AS <hello@brua.dev> (https://brua.dev)",
+  "license": "MIT",
+  "homepage": "https://brua.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Meginhufr/brua-web.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "default": "./dist/vue.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "svelte": "./dist/svelte.js",
+      "default": "./dist/svelte.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/BruaPicture.svelte dist/",
+    "test": "node --test test/"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "svelte": ">=5",
+    "vue": ">=3.3"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "svelte": "5.16.0",
+    "typescript": "5.9.3",
+    "vue": "3.5.13"
+  }
+}
