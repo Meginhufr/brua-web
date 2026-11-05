@@ -19,8 +19,8 @@ export function provideBrua(options: Brua | BruaOptions): Brua {
 }
 
 /**
- * The asset's current release for an id, from the provided Brua or the one given: undefined until it has loaded,
- * and when nothing is released under the id. A server render shows the fallback.
+ * The asset's current release for an id, from the provided Brua or the one given: the last release it read at once, else
+ * undefined until it has loaded, and when nothing is released under the id. A server render shows the fallback.
  */
 export function useBruaAsset(id: MaybeRefOrGetter<string | undefined>, brua?: Brua): Ref<AssetResponse | undefined> {
   const client = brua ?? inject(bruaKey, undefined);
@@ -31,7 +31,8 @@ export function useBruaAsset(id: MaybeRefOrGetter<string | undefined>, brua?: Br
     if (!client) throw new Error("useBruaAsset needs provideBrua() in a parent, or a Brua passed in.");
     let live = true;
     onCleanup(() => { live = false; });
-    client.asset(wanted).then((loaded) => { if (live) asset.value = loaded; });
+    asset.value = client.cachedAsset(wanted);
+    client.asset(wanted).then((loaded) => { if (live) asset.value = loaded; }, () => {});
   });
   return asset;
 }

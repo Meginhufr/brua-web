@@ -23,14 +23,14 @@ export function getBrua(): Brua | undefined {
 }
 
 /**
- * A store of the asset's current release for an id: undefined until it has loaded, and when nothing is released
- * under the id. Reads through the context's Brua unless one is given; call it during component setup.
+ * A store of the asset's current release for an id: the last release the Brua read at once, else undefined until it
+ * has loaded, and when nothing is released under the id. Reads through the context's Brua unless one is given; call it during component setup.
  */
 export function bruaAsset(id: string, brua: Brua | undefined = getBrua()): Readable<AssetResponse | undefined> {
   if (!brua) throw new Error("bruaAsset needs setBrua() in a parent, or a Brua passed in.");
-  return readable<AssetResponse | undefined>(undefined, (set) => {
+  return readable<AssetResponse | undefined>(brua.cachedAsset(id), (set) => {
     let live = true;
-    brua.asset(id).then((loaded) => { if (live) set(loaded); });
+    brua.asset(id).then((loaded) => { if (live) set(loaded); }, () => {});
     return () => { live = false; };
   });
 }

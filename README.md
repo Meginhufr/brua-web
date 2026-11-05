@@ -10,7 +10,7 @@ Your backend passes asset ids on, and the page reads each asset's current releas
 
 ## From an id
 
-Configure once where your organization's assets live, then render by id. The asset is fetched from `{base}/{id}.json` with no key, reused for a minute (the edge's own lifetime) by everyone who asks, and a merge in Brua reaches the page within that minute with no deploy of yours.
+Configure once where your organization's assets live, then render by id. The asset is fetched from `{base}/{id}.json` with no key, and remembered by everyone who asks: answered from memory for the edge's minute, read again after that, and kept when the edge can't be reached. A merge in Brua reaches the page within that minute with no deploy of yours; `brua.cachedAsset(id)` gives the last release read at once, and `brua.prefetch(ids)` reads a list's ids before it renders.
 
 ```ts
 import { createBrua } from "@meginhufr/brua-web";

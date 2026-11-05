@@ -12,16 +12,21 @@ import { icon } from "./sample.ts";
 
 const base = "https://cdn.test/assets/0f8fad5b-d9cb-469f-a165-70867728950e";
 
-/** Answers the icon's URL with its JSON, anything else with 404, and remembers what was asked for. */
+/**
+ * Answers the icon's URL with its JSON, anything else with 404, with the edge's minute, and remembers what was asked
+ * for. `down` makes every request fail as a lost connection.
+ */
 function fakeEdge(status = 200) {
   const requests: string[] = [];
+  const state = { down: false };
   const fetch = async (input: string | URL | Request) => {
     const url = String(input);
     requests.push(url);
+    if (state.down) throw new TypeError("fetch failed");
     const known = new URL(url).pathname.endsWith("/gift-icon.json");
-    return new Response(known ? JSON.stringify(icon) : "Unknown asset", { status: known ? status : 404 });
+    return new Response(known ? JSON.stringify(icon) : "Unknown asset", { status: known ? status : 404, headers: { "Cache-Control": "public, max-age=60" } });
   };
-  return { requests, fetch: fetch as typeof globalThis.fetch };
+  return { requests, state, fetch: fetch as typeof globalThis.fetch };
 }
 
 test("an id is read from the edge once a minute, with the language in the URL, and an unknown one is undefined", async () => {
@@ -51,6 +56,55 @@ test("after its lifetime the asset is asked for again, and a failure is not reme
   await assert.rejects(flaky.asset("gift-icon"), /answered 500/);
   await assert.rejects(flaky.asset("gift-icon"));
   assert.equal(failing.requests.length, 2, "asked again right away");
+});
+
+test("the last release read is there at once, and kept when the edge can't be reached", async () => {
+  const edge = fakeEdge();
+  const brua = createBrua({ base, maxAge: 0, fetch: edge.fetch });
+  assert.equal(brua.cachedAsset("gift-icon"), undefined);
+  await brua.asset("gift-icon");
+  assert.deepEqual(brua.cachedAsset("gift-icon"), icon);
+
+  edge.state.down = true;
+  assert.deepEqual(await brua.asset("gift-icon"), icon, "the stale release, not an error");
+  await assert.rejects(brua.asset("never-read"), /fetch failed/);
+});
+
+test("reads of one id at the same time share a request, and an id with nothing released is remembered too", async () => {
+  const edge = fakeEdge();
+  const brua = createBrua({ base, fetch: edge.fetch });
+
+  const [a, b] = await Promise.all([brua.asset("gift-icon"), brua.asset("gift-icon")]);
+  await brua.asset("nothing-released");
+  await brua.asset("nothing-released");
+
+  assert.equal(a, b);
+  assert.deepEqual(edge.requests, [`${base}/gift-icon.json`, `${base}/nothing-released.json`]);
+});
+
+test("prefetch reads every id once, so they are in memory", async () => {
+  const edge = fakeEdge();
+  const brua = createBrua({ base, fetch: edge.fetch });
+
+  await brua.prefetch(["gift-icon", "gift-icon", "nothing-released"]);
+
+  assert.deepEqual(brua.cachedAsset("gift-icon"), icon);
+  assert.equal(edge.requests.length, 2);
+});
+
+test("in a browser without a language, the URL carries the browser's languages", (t) => {
+  const g = globalThis as Record<string, unknown>;
+  const had = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  g.window = {};
+  Object.defineProperty(globalThis, "navigator", { value: { languages: ["nb-NO", "en"] }, configurable: true });
+  t.after(() => {
+    delete g.window;
+    if (had) Object.defineProperty(globalThis, "navigator", had);
+  });
+
+  const url = new URL(createBrua({ base }).url("gift-icon"));
+
+  assert.equal(url.searchParams.get("lang"), "nb-NO, en;q=0.9");
 });
 
 test("on the server the id form renders the fallback, and the provider hands the Brua down", () => {

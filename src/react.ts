@@ -19,18 +19,20 @@ export function BruaProvider(props: BruaProviderProps): ReactElement {
 }
 
 /**
- * The asset's current release for an id, from the provider's Brua or the one given: undefined until it has loaded,
- * and when nothing is released under the id. Loads only in the browser; a server render shows the fallback.
+ * The asset's current release for an id, from the provider's Brua or the one given: the last release it read at once, else
+ * undefined until it has loaded, and when nothing is released under the id. Loads only in the browser; a server render shows the fallback.
  */
 export function useBruaAsset(id: string | undefined, brua?: Brua): AssetResponse | undefined {
   const fromContext = useContext(BruaContext);
   const client = brua ?? fromContext;
-  const [asset, setAsset] = useState<AssetResponse>();
+  // The last release the Brua read renders at once, so a remounted picture doesn't flash its fallback.
+  const [asset, setAsset] = useState<AssetResponse | undefined>(() => (id === undefined ? undefined : client?.cachedAsset(id)));
   if (id !== undefined && !client) throw new Error("useBruaAsset needs a <BruaProvider> above it, or a Brua passed in.");
   useEffect(() => {
     if (id === undefined || !client) return;
     let live = true;
-    client.asset(id).then((loaded) => { if (live) setAsset(loaded); });
+    setAsset(client.cachedAsset(id));
+    client.asset(id).then((loaded) => { if (live) setAsset(loaded); }, () => {});
     return () => { live = false; };
   }, [client, id]);
   return id === undefined ? undefined : asset;
