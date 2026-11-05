@@ -60,7 +60,7 @@ test("Vue renders the same picture as pictureHtml, with attributes on the img", 
 test("Svelte renders the same picture as pictureHtml", async () => {
   // Compiled for the server into the package, so the output resolves "svelte" from node_modules.
   const source = readFileSync(new URL("../src/BruaPicture.svelte", import.meta.url), "utf8");
-  const compiled = compile(source.replace('from "./picture.ts"', 'from "../../src/picture.ts"'), { generate: "server", filename: "BruaPicture.svelte" });
+  const compiled = compile(source.replace('from "./picture.ts"', 'from "../../src/picture.ts"').replace('from "./brua.ts"', 'from "../../src/brua.ts"'), { generate: "server", filename: "BruaPicture.svelte" });
   const dir = fileURLToPath(new URL("./.compiled/", import.meta.url));
   mkdirSync(dir, { recursive: true });
   const file = `${dir}BruaPicture.js`;

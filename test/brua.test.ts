@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
-import { createBrua } from "../src/brua.ts";
+import { assetOrError, createBrua } from "../src/brua.ts";
 import { BruaPicture as ReactPicture, BruaProvider } from "../src/react.ts";
 import { BruaPicture as VuePicture, provideBrua } from "../src/vue.ts";
 import { icon } from "./sample.ts";
@@ -127,4 +127,16 @@ test("Vue reads the id through the provided Brua and shows the slot until it has
   const html = await renderToString(app);
   assert.equal(html.replace(/<!--[^>]*-->/g, ""), '<span class="skeleton"></span>');
   assert.deepEqual(edge.requests, [`${base}/gift-icon.json`]);
+});
+
+test("an id reads as its asset, or as why there is none: not released, or the edge unreachable", async () => {
+  const edge = fakeEdge();
+  const brua = createBrua({ base, fetch: edge.fetch });
+
+  assert.deepEqual(await assetOrError(brua, "gift-icon"), { asset: icon });
+  assert.deepEqual(await assetOrError(brua, "nothing-released"), { error: { reason: "notReleased" } });
+
+  edge.state.down = true;
+  const unreachable = await assetOrError(createBrua({ base, fetch: edge.fetch }), "gift-icon");
+  assert.equal(unreachable.error?.reason, "unreachable");
 });

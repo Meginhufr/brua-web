@@ -14,6 +14,15 @@ export interface AssetResponse {
   objectPosition?: string;
 }
 
+/**
+ * Why a picture has none to show, with the same reasons on every platform's SDK: nothing is released under the id (the
+ * edge answered 404, usually draw nothing), the edge can't be reached and no release is known, or the file failed.
+ */
+export type BruaImageError =
+  | { reason: "notReleased" }
+  | { reason: "unreachable"; cause: unknown }
+  | { reason: "file"; url: string };
+
 /** Value fields are plain strings, not unions, so new values from the API never break decoding (SPEC.md 14). */
 export interface AssetVariant {
   type: string;

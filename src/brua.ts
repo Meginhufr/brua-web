@@ -1,5 +1,5 @@
 // Reading assets from the edge by id (SPEC.md 5.3): the page holds a reference, Brua decides which version is live.
-import type { AssetResponse } from "./types.ts";
+import type { AssetResponse, BruaImageError } from "./types.ts";
 
 export interface BruaOptions {
   /** The organization's asset prefix on the edge, such as https://cdn.brua.dev/assets/{org}. */
@@ -98,4 +98,17 @@ export function createBrua(options: BruaOptions): Brua {
     },
   };
   return brua;
+}
+
+/**
+ * The asset with this id, or why there is none: not released, or the edge can't be reached with no release known. The
+ * framework components show their error view from it.
+ */
+export async function assetOrError(brua: Brua, id: string): Promise<{ asset?: AssetResponse; error?: BruaImageError }> {
+  try {
+    const asset = await brua.asset(id);
+    return asset ? { asset } : { error: { reason: "notReleased" } };
+  } catch (cause) {
+    return { error: { reason: "unreachable", cause } };
+  }
 }

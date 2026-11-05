@@ -3,8 +3,8 @@ import { createContext, createElement, useContext, useEffect, useMemo, useState,
 import { pictureModel, type PictureOptions } from "./picture.ts";
 import { selectUrl } from "./select.ts";
 import { defaultClientState, watchClientState, type ClientOptions } from "./client.ts";
-import { createBrua, type Brua, type BruaOptions } from "./brua.ts";
-import type { AssetResponse } from "./types.ts";
+import { assetOrError, createBrua, type Brua, type BruaOptions } from "./brua.ts";
+import type { AssetResponse, BruaImageError } from "./types.ts";
 
 const BruaContext = createContext<Brua | undefined>(undefined);
 
@@ -23,19 +23,27 @@ export function BruaProvider(props: BruaProviderProps): ReactElement {
  * undefined until it has loaded, and when nothing is released under the id. Loads only in the browser; a server render shows the fallback.
  */
 export function useBruaAsset(id: string | undefined, brua?: Brua): AssetResponse | undefined {
+  return useBruaAssetState(id, brua).asset;
+}
+
+/**
+ * The asset's current release for an id, as useBruaAsset gives it, or the error when there is none: not released, or
+ * the edge can't be reached with no release known. Both undefined while it loads.
+ */
+export function useBruaAssetState(id: string | undefined, brua?: Brua): { asset?: AssetResponse; error?: BruaImageError } {
   const fromContext = useContext(BruaContext);
   const client = brua ?? fromContext;
   // The last release the Brua read renders at once, so a remounted picture doesn't flash its fallback.
-  const [asset, setAsset] = useState<AssetResponse | undefined>(() => (id === undefined ? undefined : client?.cachedAsset(id)));
+  const [state, setState] = useState<{ asset?: AssetResponse; error?: BruaImageError }>(() => ({ asset: id === undefined ? undefined : client?.cachedAsset(id) }));
   if (id !== undefined && !client) throw new Error("useBruaAsset needs a <BruaProvider> above it, or a Brua passed in.");
   useEffect(() => {
     if (id === undefined || !client) return;
     let live = true;
-    setAsset(client.cachedAsset(id));
-    client.asset(id).then((loaded) => { if (live) setAsset(loaded); }, () => {});
+    setState({ asset: client.cachedAsset(id) });
+    assetOrError(client, id).then((read) => { if (live) setState(read); });
     return () => { live = false; };
   }, [client, id]);
-  return id === undefined ? undefined : asset;
+  return id === undefined ? {} : state;
 }
 
 export interface BruaPictureProps extends PictureOptions {
@@ -45,19 +53,25 @@ export interface BruaPictureProps extends PictureOptions {
   id?: string;
   /** The Brua to read the id through, instead of the provider's. */
   brua?: Brua;
-  /** What shows until the id has loaded, and when nothing is released under it. */
+  /** What shows until the id has loaded, and on failure when no error view is given. */
   fallback?: ReactNode;
+  /** What shows when there is no picture, with the reason: nothing released, the edge unreachable, or the file failed. */
+  error?: ReactNode | ((error: BruaImageError) => ReactNode);
 }
 
 /**
  * The asset as a picture element (SPEC.md 7.2): the browser picks the format, density and color scheme,
  * and follows dark mode live. Animations show their still.
  */
-export function BruaPicture({ asset, id, brua, fallback = null, sizes, loading, className, colorScheme, objectFit, objectPosition }: BruaPictureProps): ReactElement | null {
-  const fetched = useBruaAsset(asset ? undefined : id, brua);
-  const shown = asset ?? fetched;
-  if (!shown) return fallback as ReactElement | null;
+export function BruaPicture({ asset, id, brua, fallback = null, error, sizes, loading, className, colorScheme, objectFit, objectPosition }: BruaPictureProps): ReactElement | null {
+  const fetched = useBruaAssetState(asset ? undefined : id, brua);
+  const [failed, setFailed] = useState<string>();
+  const shown = asset ?? fetched.asset;
+  const failure = (reason: BruaImageError) => (error === undefined ? fallback : typeof error === "function" ? error(reason) : error) as ReactElement | null;
+  if (!shown) return fetched.error ? failure(fetched.error) : fallback as ReactElement | null;
   const { sources, img } = pictureModel(shown, { sizes, loading, className, colorScheme, objectFit, objectPosition });
+  // The img's own error event: the file failed. Another file (a merge, another size) tries again.
+  if (failed === img.src) return failure({ reason: "file", url: img.src });
   return createElement(
     "picture",
     null,
@@ -74,6 +88,7 @@ export function BruaPicture({ asset, id, brua, fallback = null, sizes, loading, 
       decoding: img.decoding,
       className: img.className,
       style: img.objectFit === undefined ? undefined : { objectFit: img.objectFit, objectPosition: img.objectPosition },
+      onError: () => setFailed(img.src),
     }),
   );
 }

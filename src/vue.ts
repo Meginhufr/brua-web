@@ -6,8 +6,8 @@ import {
 import { fillStyle, pictureModel } from "./picture.ts";
 import { selectUrl } from "./select.ts";
 import { defaultClientState, watchClientState, type ClientOptions } from "./client.ts";
-import { createBrua, type Brua, type BruaOptions } from "./brua.ts";
-import type { AssetResponse } from "./types.ts";
+import { assetOrError, createBrua, type Brua, type BruaOptions } from "./brua.ts";
+import type { AssetResponse, BruaImageError } from "./types.ts";
 
 export const bruaKey: InjectionKey<Brua> = Symbol("brua");
 
@@ -23,24 +23,34 @@ export function provideBrua(options: Brua | BruaOptions): Brua {
  * undefined until it has loaded, and when nothing is released under the id. A server render shows the fallback.
  */
 export function useBruaAsset(id: MaybeRefOrGetter<string | undefined>, brua?: Brua): Ref<AssetResponse | undefined> {
+  const state = useBruaAssetState(id, brua);
+  return computed(() => state.value.asset);
+}
+
+/**
+ * The asset's current release for an id, as useBruaAsset gives it, or the error when there is none: not released, or
+ * the edge can't be reached with no release known. Both undefined while it loads.
+ */
+export function useBruaAssetState(id: MaybeRefOrGetter<string | undefined>, brua?: Brua): Ref<{ asset?: AssetResponse; error?: BruaImageError }> {
   const client = brua ?? inject(bruaKey, undefined);
-  const asset = ref<AssetResponse>();
+  const state = ref<{ asset?: AssetResponse; error?: BruaImageError }>({});
   watchEffect((onCleanup) => {
     const wanted = toValue(id);
-    if (wanted === undefined) { asset.value = undefined; return; }
+    if (wanted === undefined) { state.value = {}; return; }
     if (!client) throw new Error("useBruaAsset needs provideBrua() in a parent, or a Brua passed in.");
     let live = true;
     onCleanup(() => { live = false; });
-    asset.value = client.cachedAsset(wanted);
-    client.asset(wanted).then((loaded) => { if (live) asset.value = loaded; }, () => {});
+    state.value = { asset: client.cachedAsset(wanted) };
+    assetOrError(client, wanted).then((read) => { if (live) state.value = read; });
   });
-  return asset;
+  return state as Ref<{ asset?: AssetResponse; error?: BruaImageError }>;
 }
 
 /**
  * The asset as a picture element (SPEC.md 7.2): the browser picks the format, density and color scheme,
  * and follows dark mode live. Animations show their still. Attributes such as class go on the img.
- * The default slot shows until an id has loaded, and when nothing is released under it.
+ * The default slot shows until an id has loaded; the error slot, given the reason as `error`, when there is no picture:
+ * nothing released, the edge unreachable, or the file failed. Without an error slot the default one shows then.
  */
 export const BruaPicture = defineComponent({
   name: "BruaPicture",
@@ -63,13 +73,17 @@ export const BruaPicture = defineComponent({
     objectPosition: { type: String, required: false },
   },
   setup(props, { attrs, slots }) {
-    const fetched = useBruaAsset(() => (props.asset ? undefined : props.id), props.brua);
+    const fetched = useBruaAssetState(() => (props.asset ? undefined : props.id), props.brua);
+    const failed = ref<string>();
+    const failure = (error: BruaImageError) => (slots.error ?? slots.default)?.({ error }) ?? null;
     return () => {
-      const asset = props.asset ?? fetched.value;
-      if (!asset) return slots.default?.() ?? null;
+      const asset = props.asset ?? fetched.value.asset;
+      if (!asset) return fetched.value.error ? failure(fetched.value.error) : slots.default?.() ?? null;
       const { sources, img } = pictureModel(asset, {
         sizes: props.sizes, loading: props.loading, colorScheme: props.colorScheme, objectFit: props.objectFit, objectPosition: props.objectPosition,
       });
+      // The img's own error event: the file failed. Another file (a merge, another size) tries again.
+      if (failed.value === img.src) return failure({ reason: "file", url: img.src });
       return h("picture", [
         ...sources.map((s) => h("source", { key: `${s.type}${s.media ?? ""}`, type: s.type, media: s.media, srcset: s.srcset, sizes: s.sizes })),
         h("img", {
@@ -85,6 +99,7 @@ export const BruaPicture = defineComponent({
           decoding: img.decoding,
           // The fill first, so a style the page gives the component still wins.
           style: [fillStyle(img), attrs.style],
+          onError: () => { failed.value = img.src; },
         }),
       ]);
     };
