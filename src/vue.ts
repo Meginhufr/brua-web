@@ -3,7 +3,7 @@ import {
   computed, defineComponent, h, inject, onBeforeUnmount, onMounted, provide, ref, toValue, unref, watchEffect,
   type ComputedRef, type InjectionKey, type MaybeRef, type MaybeRefOrGetter, type PropType, type Ref,
 } from "vue";
-import { pictureModel } from "./picture.ts";
+import { fillStyle, pictureModel } from "./picture.ts";
 import { selectUrl } from "./select.ts";
 import { defaultClientState, watchClientState, type ClientOptions } from "./client.ts";
 import { createBrua, type Brua, type BruaOptions } from "./brua.ts";
@@ -57,13 +57,19 @@ export const BruaPicture = defineComponent({
     loading: { type: String as PropType<"lazy" | "eager">, required: false },
     /** "light" or "dark" to show that scheme's files only, for apps that switch themes themselves. */
     colorScheme: { type: String as PropType<"light" | "dark">, required: false },
+    /** "contain" or "cover" to override the asset's fit, or "none" to leave the fit to the page's CSS. */
+    objectFit: { type: String as PropType<"contain" | "cover" | "none">, required: false },
+    /** Where the img sits in its box, as "x% y%", instead of the asset's position. */
+    objectPosition: { type: String, required: false },
   },
   setup(props, { attrs, slots }) {
     const fetched = useBruaAsset(() => (props.asset ? undefined : props.id), props.brua);
     return () => {
       const asset = props.asset ?? fetched.value;
       if (!asset) return slots.default?.() ?? null;
-      const { sources, img } = pictureModel(asset, { sizes: props.sizes, loading: props.loading, colorScheme: props.colorScheme });
+      const { sources, img } = pictureModel(asset, {
+        sizes: props.sizes, loading: props.loading, colorScheme: props.colorScheme, objectFit: props.objectFit, objectPosition: props.objectPosition,
+      });
       return h("picture", [
         ...sources.map((s) => h("source", { key: `${s.type}${s.media ?? ""}`, type: s.type, media: s.media, srcset: s.srcset, sizes: s.sizes })),
         h("img", {
@@ -77,6 +83,8 @@ export const BruaPicture = defineComponent({
           lang: img.lang,
           loading: img.loading,
           decoding: img.decoding,
+          // The fill first, so a style the page gives the component still wins.
+          style: [fillStyle(img), attrs.style],
         }),
       ]);
     };

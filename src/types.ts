@@ -8,6 +8,10 @@ export interface AssetResponse {
   alt: string;
   lang?: string;
   variants: AssetVariant[];
+  /** How a layout's box of another shape holds the asset, as CSS object-fit: "contain" or "cover". */
+  objectFit?: string;
+  /** Where it sits in the box, as CSS object-position: "50% 35%", the point a cover crop keeps in view. */
+  objectPosition?: string;
 }
 
 /** Value fields are plain strings, not unions, so new values from the API never break decoding (SPEC.md 14). */

@@ -53,11 +53,11 @@ export interface BruaPictureProps extends PictureOptions {
  * The asset as a picture element (SPEC.md 7.2): the browser picks the format, density and color scheme,
  * and follows dark mode live. Animations show their still.
  */
-export function BruaPicture({ asset, id, brua, fallback = null, sizes, loading, className, colorScheme }: BruaPictureProps): ReactElement | null {
+export function BruaPicture({ asset, id, brua, fallback = null, sizes, loading, className, colorScheme, objectFit, objectPosition }: BruaPictureProps): ReactElement | null {
   const fetched = useBruaAsset(asset ? undefined : id, brua);
   const shown = asset ?? fetched;
   if (!shown) return fallback as ReactElement | null;
-  const { sources, img } = pictureModel(shown, { sizes, loading, className, colorScheme });
+  const { sources, img } = pictureModel(shown, { sizes, loading, className, colorScheme, objectFit, objectPosition });
   return createElement(
     "picture",
     null,
@@ -73,6 +73,7 @@ export function BruaPicture({ asset, id, brua, fallback = null, sizes, loading, 
       loading: img.loading,
       decoding: img.decoding,
       className: img.className,
+      style: img.objectFit === undefined ? undefined : { objectFit: img.objectFit, objectPosition: img.objectPosition },
     }),
   );
 }

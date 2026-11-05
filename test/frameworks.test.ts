@@ -40,6 +40,8 @@ test("React renders the same picture as pictureHtml", () => {
     if (asset === icon) assert.match(html, /media="\(prefers-color-scheme: dark\)"/);
     if (asset === photo) assert.match(html, /sizes="\(min-width: 600px\) 50vw, 100vw"/);
   }
+  const filled = renderToStaticMarkup(createElement(ReactPicture, { asset: { ...photo, objectFit: "cover", objectPosition: "50% 35%" } }));
+  assert.match(filled, /<img [^>]*style="object-fit:cover;object-position:50% 35%"/);
 });
 
 test("Vue renders the same picture as pictureHtml, with attributes on the img", async () => {
@@ -51,6 +53,8 @@ test("Vue renders the same picture as pictureHtml, with attributes on the img", 
     assert.match(html, /<img [^>]*class="hero"/);
     assert.match(html, /width="96"|width="1600"/);
   }
+  const filled = await renderToString(createSSRApp({ render: () => h(VuePicture, { asset: { ...photo, objectFit: "cover" }, objectPosition: "10% 20%" }) }));
+  assert.match(filled, /<img [^>]*style="object-fit:cover;object-position:10% 20%;?"/);
 });
 
 test("Svelte renders the same picture as pictureHtml", async () => {
@@ -68,5 +72,7 @@ test("Svelte renders the same picture as pictureHtml", async () => {
     assert.match(body, /<picture>/);
     assert.match(body, /<img [^>]*class="hero"/);
     assert.match(body, /alt="(Gavekort|Beach at dusk)"/);
+    const { body: filled } = render(SveltePicture, { props: { asset: { ...asset, objectFit: "cover", objectPosition: "50% 35%" } } });
+    assert.match(filled, /<img [^>]*style="object-fit: cover; object-position: 50% 35%"/);
   }
 });

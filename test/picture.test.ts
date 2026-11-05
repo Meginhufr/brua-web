@@ -59,3 +59,16 @@ test("a decorative asset keeps an empty alt, and attributes are escaped", () => 
   assert.match(pictureHtml(asset), / alt=""/);
   assert.match(pictureHtml({ ...asset, alt: 'Say "hi" <3' }), /alt="Say &quot;hi&quot; &lt;3"/);
 });
+
+test("the img draws with the asset's fill, an override wins, and none leaves it to the page", () => {
+  const photo = { ...fixture("01-flexible-picks-the-smallest-width-that-covers-the-target.json"), objectFit: "cover", objectPosition: "50% 35%" };
+  assert.match(pictureHtml(photo), /<img [^>]*style="object-fit: cover; object-position: 50% 35%"/);
+  assert.match(pictureHtml(photo, { objectFit: "contain", objectPosition: "0% 50%" }), /style="object-fit: contain; object-position: 0% 50%"/);
+  assert.doesNotMatch(pictureHtml(photo, { objectFit: "none" }), /style=/);
+});
+
+test("a response from before the fill gets no style, and values CSS doesn't take fall back to the defaults", () => {
+  assert.doesNotMatch(pictureHtml(mark), /style=/);
+  const odd = { ...mark, objectFit: "fill; color: red", objectPosition: "top; color: red" };
+  assert.match(pictureHtml(odd), /style="object-fit: contain; object-position: 50% 50%"/);
+});

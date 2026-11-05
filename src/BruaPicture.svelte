@@ -4,10 +4,10 @@
      setBrua(); the last release it read shows at once, else the children until it has loaded, and when nothing is released under the id. -->
 <script>
   import { getContext } from "svelte";
-  import { pictureModel } from "./picture.ts";
+  import { fillStyle, pictureModel } from "./picture.ts";
 
-  /** @type {{ asset?: import("./types.ts").AssetResponse, id?: string, brua?: import("./brua.ts").Brua, sizes?: string, loading?: "lazy" | "eager", class?: string, colorScheme?: "light" | "dark", children?: import("svelte").Snippet }} */
-  let { asset: given, id, brua = getContext("brua"), sizes, loading, class: imgClass, colorScheme, children } = $props();
+  /** @type {{ asset?: import("./types.ts").AssetResponse, id?: string, brua?: import("./brua.ts").Brua, sizes?: string, loading?: "lazy" | "eager", class?: string, colorScheme?: "light" | "dark", objectFit?: "contain" | "cover" | "none", objectPosition?: string, children?: import("svelte").Snippet }} */
+  let { asset: given, id, brua = getContext("brua"), sizes, loading, class: imgClass, colorScheme, objectFit, objectPosition, children } = $props();
   // The last release the Brua read renders at once, so a remounted picture doesn't flash its children.
   let fetched = $state(id === undefined ? undefined : brua?.cachedAsset(id));
 
@@ -21,7 +21,7 @@
   });
 
   let asset = $derived(given ?? fetched);
-  let model = $derived(asset ? pictureModel(asset, { sizes, loading, className: imgClass, colorScheme }) : undefined);
+  let model = $derived(asset ? pictureModel(asset, { sizes, loading, className: imgClass, colorScheme, objectFit, objectPosition }) : undefined);
 </script>
 
 {#if model}
@@ -40,6 +40,7 @@
       loading={model.img.loading}
       decoding={model.img.decoding}
       class={model.img.className}
+      style={fillStyle(model.img)}
     />
   </picture>
 {:else if children}

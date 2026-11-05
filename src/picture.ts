@@ -1,4 +1,5 @@
 import type { AssetResponse, AssetVariant } from "./types.ts";
+import { objectFitOf, objectPositionOf } from "./sizing.ts";
 
 export interface PictureOptions {
   /** The `sizes` attribute for flexible assets; defaults to the asset's width in CSS pixels. */
@@ -10,6 +11,13 @@ export interface PictureOptions {
    * the dark files go behind a media query and the browser follows the system setting.
    */
   colorScheme?: "light" | "dark";
+  /**
+   * How the img fills its box: "contain" or "cover" overrides the asset's own fit, and "none" leaves the fit and
+   * the position to the page's CSS. Left out, the asset's fit is used.
+   */
+  objectFit?: "contain" | "cover" | "none";
+  /** Where the img sits in its box, as "x% y%"; left out, the asset's position. */
+  objectPosition?: string;
 }
 
 /** A `<source>` of the picture: one format, optionally one color scheme. */
@@ -32,6 +40,9 @@ export interface PictureImage {
   loading: "lazy" | "eager";
   decoding: "async";
   className?: string;
+  /** The object-fit and object-position the img is drawn with, when the asset or the call site gives a fill. */
+  objectFit?: "contain" | "cover";
+  objectPosition?: string;
 }
 
 /** What a picture element for the asset consists of; the HTML renderer and the framework components build from it. */
@@ -97,8 +108,24 @@ export function pictureModel(asset: AssetResponse, options: PictureOptions = {})
       loading: options.loading ?? "lazy",
       decoding: "async",
       className: options.className,
+      ...fill(asset, options),
     },
   };
+}
+
+/**
+ * The fill to put on the img: the call site's or the asset's, cleaned to what CSS takes. A response from before the
+ * fill, with no override either, gets none, so the page draws it as it always has.
+ */
+function fill(asset: AssetResponse, options: PictureOptions): Pick<PictureImage, "objectFit" | "objectPosition"> {
+  if (options.objectFit === "none") return {};
+  if (asset.objectFit === undefined && asset.objectPosition === undefined && options.objectFit === undefined && options.objectPosition === undefined) return {};
+  return { objectFit: objectFitOf(asset, options.objectFit), objectPosition: objectPositionOf(asset, options.objectPosition) };
+}
+
+/** The img's fill as a style attribute's value. */
+export function fillStyle(img: PictureImage): string | undefined {
+  return img.objectFit === undefined ? undefined : `object-fit: ${img.objectFit}; object-position: ${img.objectPosition}`;
 }
 
 /** The picture as an HTML string, for innerHTML or server-rendered pages. */
@@ -116,6 +143,7 @@ export function pictureHtml(asset: AssetResponse, options: PictureOptions = {}):
     loading: img.loading,
     decoding: img.decoding,
     class: img.className,
+    style: fillStyle(img),
   }));
   return `<picture>${rendered.join("")}</picture>`;
 }

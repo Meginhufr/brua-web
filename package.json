@@ -7,7 +7,7 @@
   "homepage": "https://brua.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Meginhufr/brua-web.git"
+    "url": "git+https://github.com/Meginhufr/brua-web.git"
   },
   "type": "module",
   "sideEffects": false,
